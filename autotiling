@@ -32,7 +32,7 @@ if [[ $# -gt 0 ]]; then
 fi
 
 # Get window dimensions using AppleScript
-DIMENSIONS=$(osascript -e 'tell application "System Events" to tell (first process whose frontmost is true) to get size of window 1' 2>/dev/null)
+DIMENSIONS=$(osascript -e 'tell application "System Events" to tell (first process whose frontmost is true) to get size of (value of attribute "AXFocusedWindow")' 2>/dev/null)
 
 if [[ -n "$DIMENSIONS" ]]; then
     # Parse width and height from "width, height" format
