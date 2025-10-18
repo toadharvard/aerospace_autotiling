@@ -1,9 +1,59 @@
 #!/bin/bash
+#
+# Smart autotiling for AeroSpace using AppleScript
+# Simple and reliable solution using macOS Accessibility API
+#
 
-NUM=$(aerospace list-windows --workspace focused | wc -l)
-
-if (($NUM % 2 == 0)); then
-  aerospace split vertical
-else
-  aerospace split horizontal
+# Get focused window info from AeroSpace
+WINDOW_JSON=$(aerospace list-windows --focused --json 2>/dev/null)
+if [[ -z "$WINDOW_JSON" ]]; then
+    exit 0
 fi
+
+# Check fullscreen status
+IS_FULLSCREEN=$(echo "$WINDOW_JSON" | grep -o '"window-is-fullscreen" : true')
+if [[ -n "$IS_FULLSCREEN" ]]; then
+    exit 0
+fi
+
+# Optional: Filter by workspace (pass workspace names as arguments)
+if [[ $# -gt 0 ]]; then
+    CURRENT_WORKSPACE=$(echo "$WINDOW_JSON" | grep -o '"workspace" : "[^"]*"' | cut -d'"' -f4)
+    WORKSPACE_ALLOWED=false
+    for ws in "$@"; do
+        if [[ "$CURRENT_WORKSPACE" == "$ws" ]]; then
+            WORKSPACE_ALLOWED=true
+            break
+        fi
+    done
+    if [[ "$WORKSPACE_ALLOWED" == "false" ]]; then
+        exit 0
+    fi
+fi
+
+# Get window dimensions using AppleScript
+DIMENSIONS=$(osascript -e 'tell application "System Events" to tell (first process whose frontmost is true) to get size of window 1' 2>/dev/null)
+
+if [[ -n "$DIMENSIONS" ]]; then
+    # Parse width and height from "width, height" format
+    WIDTH=$(echo "$DIMENSIONS" | cut -d',' -f1 | tr -d ' ')
+    HEIGHT=$(echo "$DIMENSIONS" | cut -d',' -f2 | tr -d ' ')
+    
+    # Decide split based on aspect ratio
+    # If height > width: split vertically (stack top-bottom)
+    # If width > height: split horizontally (stack left-right)
+    if (( HEIGHT > WIDTH )); then
+        aerospace split vertical
+    else
+        aerospace split horizontal
+    fi
+else
+    # Fallback: use simple alternating algorithm
+    NUM=$(aerospace list-windows --workspace focused | wc -l)
+    if (( NUM % 2 == 0 )); then
+        aerospace split vertical
+    else
+        aerospace split horizontal
+    fi
+fi
+
